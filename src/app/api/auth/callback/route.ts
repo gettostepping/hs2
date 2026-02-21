@@ -78,7 +78,7 @@ export async function GET(request: Request) {
 
     if (userError) {
       console.error('Error upserting user:', userError);
-      throw userError;
+      throw new Error(`DB upsert user failed: ${userError.message ?? JSON.stringify(userError)}`);
     }
 
     // Create session
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
 
     if (sessionError) {
       console.error('Error creating session:', sessionError);
-      throw sessionError;
+      throw new Error(`DB insert session failed: ${sessionError.message ?? JSON.stringify(sessionError)}`);
     }
 
     // Set cookie
@@ -111,8 +111,13 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${baseUrl}/dashboard`);
   } catch (error) {
     console.error('Auth error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorCode = encodeURIComponent(errorMessage.slice(0, 120));
+    let errorMessage: string;
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    } else {
+      try { errorMessage = JSON.stringify(error); } catch { errorMessage = String(error); }
+    }
+    const errorCode = encodeURIComponent(errorMessage.slice(0, 200));
     return NextResponse.redirect(`${baseUrl}?error=auth_failed&detail=${errorCode}`);
   }
 }
