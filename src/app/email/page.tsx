@@ -19,6 +19,19 @@ interface Template {
   body: string;
 }
 
+type FilterMode = 'single' | 'range';
+
+// Returns today's date as yyyy-mm-dd
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// First day of current month as yyyy-mm-dd
+function firstOfMonthStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
 const EMAIL_TEMPLATES: Template[] = [
   {
     id: 'holidays2025',
@@ -35,8 +48,10 @@ const EMAIL_TEMPLATES: Template[] = [
 ];
 
 export default function EmailPage() {
-  const [month, setMonth] = useState(new Date().getMonth() + 1);
-  const [year, setYear] = useState(new Date().getFullYear());
+  const [filterMode, setFilterMode] = useState<FilterMode>('single');
+  const [singleDate, setSingleDate] = useState(todayStr());
+  const [startDate, setStartDate] = useState(firstOfMonthStr());
+  const [endDate, setEndDate] = useState(todayStr());
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<Client[]>([]);
   const [error, setError] = useState('');
@@ -52,19 +67,30 @@ export default function EmailPage() {
     setClients([]);
     setSendResult(null);
 
+    let reqStart: string;
+    let reqEnd: string;
+
+    if (filterMode === 'single') {
+      reqStart = singleDate;
+      reqEnd = singleDate;
+    } else {
+      reqStart = startDate;
+      reqEnd = endDate;
+    }
+
     try {
       const res = await fetch('/api/calendar/extract', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ month, year }),
+        body: JSON.stringify({ startDate: reqStart, endDate: reqEnd }),
       });
 
       if (!res.ok) {
         if (res.status === 401) {
-            window.location.href = '/'; 
-            return;
+          window.location.href = '/';
+          return;
         }
         throw new Error('Failed to fetch data');
       }
@@ -88,40 +114,40 @@ export default function EmailPage() {
 
     const template = EMAIL_TEMPLATES.find(t => t.id === selectedTemplateId);
     if (!template) {
-        setError('Template not found');
-        setSending(false);
-        return;
+      setError('Template not found');
+      setSending(false);
+      return;
     }
 
     try {
-        const res = await fetch('/api/email/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                clients: [client],
-                templateId: template.id,
-                templateSubject: template.subject,
-                templateBody: template.body
-            }),
-        });
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clients: [client],
+          templateId: template.id,
+          templateSubject: template.subject,
+          templateBody: template.body
+        }),
+      });
 
-        if (!res.ok) {
-             throw new Error('Failed to send email');
-        }
+      if (!res.ok) {
+        throw new Error('Failed to send email');
+      }
 
-        const data = await res.json();
-        setSendResult({ success: data.sent, failed: data.failed });
-        if (data.sent === 1) {
-            alert(`Email sent successfully to ${client.name}`);
-        } else {
-            alert(`Failed to send email to ${client.name}`);
-        }
+      const data = await res.json();
+      setSendResult({ success: data.sent, failed: data.failed });
+      if (data.sent === 1) {
+        alert(`Email sent successfully to ${client.name}`);
+      } else {
+        alert(`Failed to send email to ${client.name}`);
+      }
     } catch (err) {
-        setError('An error occurred while sending email.');
+      setError('An error occurred while sending email.');
     } finally {
-        setSending(false);
+      setSending(false);
     }
   };
 
@@ -137,36 +163,36 @@ export default function EmailPage() {
 
     const template = EMAIL_TEMPLATES.find(t => t.id === selectedTemplateId);
     if (!template) {
-        setError('Template not found');
-        setSending(false);
-        return;
+      setError('Template not found');
+      setSending(false);
+      return;
     }
 
     try {
-        const res = await fetch('/api/email/send', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                clients: clients,
-                templateId: template.id,
-                templateSubject: template.subject,
-                templateBody: template.body
-            }),
-        });
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clients: clients,
+          templateId: template.id,
+          templateSubject: template.subject,
+          templateBody: template.body
+        }),
+      });
 
-        if (!res.ok) {
-             throw new Error('Failed to send email');
-        }
+      if (!res.ok) {
+        throw new Error('Failed to send email');
+      }
 
-        const data = await res.json();
-        setSendResult({ success: data.sent, failed: data.failed });
-        alert(`Process complete. Sent: ${data.sent}, Failed: ${data.failed}`);
+      const data = await res.json();
+      setSendResult({ success: data.sent, failed: data.failed });
+      alert(`Process complete. Sent: ${data.sent}, Failed: ${data.failed}`);
     } catch (err) {
-        setError('An error occurred while sending email.');
+      setError('An error occurred while sending email.');
     } finally {
-        setSending(false);
+      setSending(false);
     }
   };
 
@@ -193,34 +219,71 @@ export default function EmailPage() {
             <div className="bg-white rounded-xl shadow-sm p-6">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <CalendarIcon className="w-5 h-5 text-blue-600" />
-                Select Period
+                Select Date
               </h2>
+
+              {/* Mode toggle */}
+              <div className="flex rounded-lg overflow-hidden border border-gray-200 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('single')}
+                  className={`flex-1 py-1.5 text-sm font-medium transition-colors ${filterMode === 'single'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                >
+                  Single Day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('range')}
+                  className={`flex-1 py-1.5 text-sm font-medium transition-colors ${filterMode === 'range'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-600 hover:bg-gray-50'
+                    }`}
+                >
+                  Date Range
+                </button>
+              </div>
+
               <form onSubmit={handleExtract} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
-                  <input
-                    type="number"
-                    min="2020"
-                    max="2030"
-                    value={year}
-                    onChange={(e) => setYear(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
-                  <select
-                    value={month}
-                    onChange={(e) => setMonth(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <option key={m} value={m}>
-                        {new Date(0, m - 1).toLocaleString('default', { month: 'long' })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {filterMode === 'single' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <input
+                      type="date"
+                      value={singleDate}
+                      onChange={e => setSingleDate(e.target.value)}
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        max={endDate}
+                        onChange={e => setStartDate(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        min={startDate}
+                        onChange={e => setEndDate(e.target.value)}
+                        required
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </>
+                )}
                 <button
                   type="submit"
                   disabled={loading}
@@ -245,27 +308,27 @@ export default function EmailPage() {
                     className="w-full flex justify-center items-center gap-2 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {sending ? (
-                        <>
-                           <Loader2 className="w-4 h-4 animate-spin" />
-                           Sending...
-                        </>
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Sending...
+                      </>
                     ) : (
-                        <>
-                           <Send className="w-4 h-4" />
-                           Send to All ({clients.length})
-                        </>
+                      <>
+                        <Send className="w-4 h-4" />
+                        Send to All ({clients.length})
+                      </>
                     )}
                   </button>
                   <p className="text-xs text-gray-500 mt-2 text-center">
                     Sends actual emails via your Gmail account.
                   </p>
-                  
+
                   {sendResult && (
-                      <div className={`mt-4 p-3 rounded-md text-sm ${sendResult.failed === 0 ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
-                          <p className="font-medium">Sending Complete</p>
-                          <p>Successfully sent: {sendResult.success}</p>
-                          {sendResult.failed > 0 && <p>Failed: {sendResult.failed}</p>}
-                      </div>
+                    <div className={`mt-4 p-3 rounded-md text-sm ${sendResult.failed === 0 ? 'bg-green-50 text-green-700' : 'bg-yellow-50 text-yellow-700'}`}>
+                      <p className="font-medium">Sending Complete</p>
+                      <p>Successfully sent: {sendResult.success}</p>
+                      {sendResult.failed > 0 && <p>Failed: {sendResult.failed}</p>}
+                    </div>
                   )}
                 </div>
               )}
@@ -324,10 +387,10 @@ export default function EmailPage() {
             {hasSearched && (
               <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-gray-100">
-                   <h2 className="text-lg font-semibold text-gray-900">Found {clients.length} Clients</h2>
-                   <p className="text-sm text-gray-500">
-                      Click the send button to open your default email client with the pre-filled message.
-                   </p>
+                  <h2 className="text-lg font-semibold text-gray-900">Found {clients.length} Clients</h2>
+                  <p className="text-sm text-gray-500">
+                    Click the send button to open your default email client with the pre-filled message.
+                  </p>
                 </div>
 
                 <div className="overflow-x-auto">

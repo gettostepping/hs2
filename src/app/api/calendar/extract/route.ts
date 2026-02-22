@@ -5,10 +5,10 @@ import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
-    const { month, year } = await request.json();
+    const { startDate, endDate } = await request.json();
 
-    if (!month || !year) {
-      return NextResponse.json({ error: 'Month and year are required' }, { status: 400 });
+    if (!startDate || !endDate) {
+      return NextResponse.json({ error: 'startDate and endDate are required' }, { status: 400 });
     }
 
     const cookieStore = await cookies();
@@ -34,15 +34,15 @@ export async function POST(request: Request) {
 
     // Define strict type for User to avoid TS errors
     interface User {
-        id: string;
-        email: string;
-        access_token?: string | null;
-        refresh_token?: string | null;
+      id: string;
+      email: string;
+      access_token?: string | null;
+      refresh_token?: string | null;
     }
 
     // Cast the joined data to the expected type
     const user = session.users as unknown as User;
-    
+
     // Explicitly check for null/undefined before accessing properties
     if (!user || !user.access_token) {
       return NextResponse.json({ error: 'Google account not linked' }, { status: 400 });
@@ -65,29 +65,29 @@ export async function POST(request: Request) {
     // or manually refresh if we want to persist the new access token.
     // For simplicity, we let the library handle the request. If it fails, we might need manual refresh logic.
     // A better approach for persistence:
-    
+
     oauth2Client.on('tokens', async (tokens) => {
-        if (tokens.access_token) {
-            await supabase.from('users').update({
-                access_token: tokens.access_token,
-                refresh_token: tokens.refresh_token || user.refresh_token // refresh_token might not be returned
-            }).eq('id', user.id);
-        }
+      if (tokens.access_token) {
+        await supabase.from('users').update({
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token || user.refresh_token // refresh_token might not be returned
+        }).eq('id', user.id);
+      }
     });
 
     const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-    // Calculate time range
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
-    
-    console.log(`Extracting for: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    // Calculate time range from ISO date strings (yyyy-mm-dd)
+    const rangeStart = new Date(startDate + 'T00:00:00');
+    const rangeEnd = new Date(endDate + 'T23:59:59');
+
+    console.log(`Extracting for: ${rangeStart.toISOString()} to ${rangeEnd.toISOString()}`);
     console.log(`User email: ${user.email}`);
 
     const eventsResponse = await calendar.events.list({
       calendarId: 'primary',
-      timeMin: startDate.toISOString(),
-      timeMax: endDate.toISOString(),
+      timeMin: rangeStart.toISOString(),
+      timeMax: rangeEnd.toISOString(),
       singleEvents: true,
       orderBy: 'startTime',
     });
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
     const events = eventsResponse.data.items || [];
     console.log(`Found ${events.length} events`);
     if (events.length > 0) {
-        console.log('Sample event attendees:', JSON.stringify(events[0].attendees, null, 2));
+      console.log('Sample event attendees:', JSON.stringify(events[0].attendees, null, 2));
     }
 
     // Extract client info (attendees + description/summary scan)
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
     events.forEach(event => {
       const userEmail = user.email?.toLowerCase();
       const eventDate = event.start?.dateTime || event.start?.date;
-      
+
       // Extract phone numbers from description
       const foundPhones = event.description ? (event.description.match(phoneRegex) || []) : [];
       const bestPhone = foundPhones.length > 0 ? foundPhones[0] : undefined;
@@ -117,10 +117,10 @@ export async function POST(request: Request) {
       if (event.attendees) {
         event.attendees.forEach(attendee => {
           const attendeeEmail = attendee.email?.toLowerCase();
-          
+
           if (attendeeEmail && attendeeEmail !== userEmail && !attendee.self && !attendee.resource) {
-             const displayName = attendee.displayName || attendee.email?.split('@')[0] || 'Unknown';
-             addClient(attendeeEmail, displayName, eventDate, bestPhone);
+            const displayName = attendee.displayName || attendee.email?.split('@')[0] || 'Unknown';
+            addClient(attendeeEmail, displayName, eventDate, bestPhone);
           }
         });
       }
@@ -129,10 +129,10 @@ export async function POST(request: Request) {
       if (event.description) {
         const foundEmails = event.description.match(emailRegex) || [];
         foundEmails.forEach(email => {
-            const normalizedEmail = email.toLowerCase();
-            if (normalizedEmail !== userEmail) {
-                addClient(normalizedEmail, normalizedEmail.split('@')[0], eventDate, bestPhone);
-            }
+          const normalizedEmail = email.toLowerCase();
+          if (normalizedEmail !== userEmail) {
+            addClient(normalizedEmail, normalizedEmail.split('@')[0], eventDate, bestPhone);
+          }
         });
       }
 
@@ -140,37 +140,37 @@ export async function POST(request: Request) {
       if (event.summary) {
         const foundEmails = event.summary.match(emailRegex) || [];
         foundEmails.forEach(email => {
-            const normalizedEmail = email.toLowerCase();
-            if (normalizedEmail !== userEmail) {
-                addClient(normalizedEmail, normalizedEmail.split('@')[0], eventDate, bestPhone);
-            }
+          const normalizedEmail = email.toLowerCase();
+          if (normalizedEmail !== userEmail) {
+            addClient(normalizedEmail, normalizedEmail.split('@')[0], eventDate, bestPhone);
+          }
         });
       }
     });
 
     function addClient(email: string, name: string, lastMeetingDate: string | null | undefined, phone: string | undefined) {
-        if (!clientMap.has(email)) {
-            clientMap.set(email, {
-                email: email,
-                name: name,
-                meetings: 0,
-                lastMeeting: null,
-                phoneNumber: null
-            });
+      if (!clientMap.has(email)) {
+        clientMap.set(email, {
+          email: email,
+          name: name,
+          meetings: 0,
+          lastMeeting: null,
+          phoneNumber: null
+        });
+      }
+
+      const client = clientMap.get(email);
+      client.meetings++;
+
+      if (phone && !client.phoneNumber) {
+        client.phoneNumber = phone;
+      }
+
+      if (lastMeetingDate) {
+        if (!client.lastMeeting || new Date(lastMeetingDate) > new Date(client.lastMeeting)) {
+          client.lastMeeting = lastMeetingDate;
         }
-        
-        const client = clientMap.get(email);
-        client.meetings++;
-        
-        if (phone && !client.phoneNumber) {
-            client.phoneNumber = phone;
-        }
-        
-        if (lastMeetingDate) {
-            if (!client.lastMeeting || new Date(lastMeetingDate) > new Date(client.lastMeeting)) {
-                client.lastMeeting = lastMeetingDate;
-            }
-        }
+      }
     }
 
     const clients = Array.from(clientMap.values());
@@ -178,16 +178,16 @@ export async function POST(request: Request) {
     // We no longer save extraction results to the database as per user request.
     // Every request is a fresh extraction from Google Calendar.
 
-    return NextResponse.json({ 
-        clients, 
-        totalEvents: events.length,
-        extractionId: null 
+    return NextResponse.json({
+      clients,
+      totalEvents: events.length,
+      extractionId: null
     }, {
-        headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-        }
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      }
     });
 
   } catch (error) {
