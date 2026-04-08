@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, Users, Calendar as CalendarIcon, Loader2, Mail, X, CheckSquare, Square } from 'lucide-react';
+import { Download, Users, Calendar as CalendarIcon, Loader2, Mail, X, CheckSquare, Square, LogOut } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface Client {
   email: string;
@@ -26,6 +27,7 @@ function firstOfMonthStr() {
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [filterMode, setFilterMode] = useState<FilterMode>('single');
   const [singleDate, setSingleDate] = useState(todayStr());
   const [startDate, setStartDate] = useState(firstOfMonthStr());
@@ -110,6 +112,15 @@ export default function Dashboard() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/');
+    } catch (err) {
+      console.error('Failed to log out:', err);
+    }
+  };
+
   const downloadCSV = () => {
     const headers = [];
     if (exportColumns.name) headers.push('Name');
@@ -160,6 +171,13 @@ export default function Dashboard() {
               <Mail className="w-4 h-4" />
               Email Clients
             </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors font-medium shadow-sm border border-red-100"
+            >
+              <LogOut className="w-4 h-4" />
+              Log Out
+            </button>
           </div>
         </header>
 

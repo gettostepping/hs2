@@ -1,7 +1,16 @@
 import Link from 'next/link';
 import { Calendar, ArrowRight } from 'lucide-react';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
-export default function Home() {
+export default async function Home() {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get('session_token')?.value;
+
+  if (sessionToken) {
+    redirect('/dashboard');
+  }
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8 md:p-24 bg-white text-black">
       <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex mb-12">
@@ -14,17 +23,17 @@ export default function Home() {
         <div className="rounded-full bg-blue-50 p-6 ring-1 ring-blue-100 shadow-sm">
           <Calendar className="h-16 w-16 text-blue-600" />
         </div>
-        
+
         <h1 className="text-4xl md:text-6xl font-bold text-center text-gray-900 tracking-tight">
           Analyze Your <span className="text-blue-600">Client Meetings</span>
         </h1>
-        
+
         <p className="text-xl text-gray-600 text-center max-w-2xl leading-relaxed">
           Connect your Google Calendar to extract client interaction data, track meeting frequency, and manage your professional relationships efficiently.
         </p>
-        
+
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <Link 
+          <Link
             href="/api/auth/google"
             className="flex items-center gap-3 px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-lg font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
@@ -33,7 +42,7 @@ export default function Home() {
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
-        
+
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center w-full">
           <div className="p-6 rounded-2xl bg-gray-50 border border-gray-100">
             <div className="font-bold text-gray-900 mb-2 text-lg">Secure</div>

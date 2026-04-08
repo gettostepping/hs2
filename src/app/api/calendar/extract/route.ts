@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 
       // Extract phone numbers from description
       const foundPhones = event.description ? (event.description.match(phoneRegex) || []) : [];
-      const bestPhone = foundPhones.length > 0 ? foundPhones[0] : undefined;
+      const bestPhone = foundPhones.length > 0 ? foundPhones[0].replace(/[\(\)\[\]\s\-]/g, '') : undefined;
 
       // 1. Check attendees
       if (event.attendees) {
