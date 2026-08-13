@@ -39,6 +39,7 @@ export function enrichReRegistered(
         ...c,
         meetings: yearData.meetings,
         lastMeeting: yearData.lastMeeting,
+        course: yearData.course ?? c.course,
       };
     });
 }

@@ -2,6 +2,17 @@ import { google, calendar_v3 } from 'googleapis';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { cookies } from 'next/headers';
+import { parseEventTitle } from '@/lib/event-title';
+
+interface ClientRecord {
+  email: string;
+  name: string;
+  course: string | null;
+  meetings: number;
+  lastMeeting: string | null;
+  phoneNumber: string | null;
+  eventIds: Set<string>;
+}
 
 export async function POST(request: Request) {
   try {
@@ -121,72 +132,104 @@ export async function POST(request: Request) {
     events.forEach(event => {
       const userEmail = user.email?.toLowerCase();
       const eventDate = event.start?.dateTime || event.start?.date;
+      const eventId = event.id || `${eventDate ?? 'unknown'}-${event.summary ?? 'event'}`;
+      const { name: titleName, course: titleCourse } = parseEventTitle(event.summary);
 
       // Extract phone numbers from description
       const foundPhones = event.description ? (event.description.match(phoneRegex) || []) : [];
       const bestPhone = foundPhones.length > 0 ? foundPhones[0].replace(/[\(\)\[\]\s\-]/g, '') : undefined;
 
-      // 1. Check attendees
+      const emailsForEvent = new Set<string>();
+
+      // 1. Attendees
       if (event.attendees) {
         event.attendees.forEach(attendee => {
           const attendeeEmail = attendee.email?.toLowerCase();
-
           if (attendeeEmail && attendeeEmail !== userEmail && !attendee.self && !attendee.resource) {
-            const displayName = attendee.displayName || attendee.email?.split('@')[0] || 'Unknown';
-            addClient(attendeeEmail, displayName, eventDate, bestPhone);
+            emailsForEvent.add(attendeeEmail);
           }
         });
       }
 
-      // 2. Scan description for emails
+      // 2. Emails in description
       if (event.description) {
         const foundEmails = event.description.match(emailRegex) || [];
         foundEmails.forEach(email => {
           const normalizedEmail = email.toLowerCase();
           if (normalizedEmail !== userEmail) {
-            addClient(normalizedEmail, normalizedEmail.split('@')[0], eventDate, bestPhone);
+            emailsForEvent.add(normalizedEmail);
           }
         });
       }
 
-      // 3. Scan summary (title) for emails
+      // 3. Emails in summary (title)
       if (event.summary) {
         const foundEmails = event.summary.match(emailRegex) || [];
         foundEmails.forEach(email => {
           const normalizedEmail = email.toLowerCase();
           if (normalizedEmail !== userEmail) {
-            addClient(normalizedEmail, normalizedEmail.split('@')[0], eventDate, bestPhone);
+            emailsForEvent.add(normalizedEmail);
           }
         });
       }
+
+      emailsForEvent.forEach(email => {
+        addClient(email, eventId, eventDate, bestPhone, titleName, titleCourse);
+      });
     });
 
-    function addClient(email: string, name: string, lastMeetingDate: string | null | undefined, phone: string | undefined) {
+    function addClient(
+      email: string,
+      eventId: string,
+      lastMeetingDate: string | null | undefined,
+      phone: string | undefined,
+      titleName: string | null,
+      titleCourse: string | null
+    ) {
       if (!clientMap.has(email)) {
         clientMap.set(email, {
-          email: email,
-          name: name,
+          email,
+          name: titleName || email.split('@')[0],
+          course: titleCourse,
           meetings: 0,
           lastMeeting: null,
-          phoneNumber: null
+          phoneNumber: null,
+          eventIds: new Set(),
         });
       }
 
-      const client = clientMap.get(email);
-      client.meetings++;
+      const client = clientMap.get(email) as ClientRecord;
+
+      if (!client.eventIds.has(eventId)) {
+        client.eventIds.add(eventId);
+        client.meetings++;
+      }
+
+      if (titleName) {
+        client.name = titleName;
+      }
 
       if (phone && !client.phoneNumber) {
         client.phoneNumber = phone;
       }
 
       if (lastMeetingDate) {
-        if (!client.lastMeeting || new Date(lastMeetingDate) > new Date(client.lastMeeting)) {
+        const isNewer =
+          !client.lastMeeting || new Date(lastMeetingDate) > new Date(client.lastMeeting);
+        if (isNewer) {
           client.lastMeeting = lastMeetingDate;
+          if (titleCourse) {
+            client.course = titleCourse;
+          }
         }
+      } else if (titleCourse && !client.course) {
+        client.course = titleCourse;
       }
     }
 
-    const clients = Array.from(clientMap.values());
+    const clients = Array.from(clientMap.values()).map(
+      ({ eventIds: _eventIds, ...client }) => client
+    );
 
     // We no longer save extraction results to the database as per user request.
     // Every request is a fresh extraction from Google Calendar.

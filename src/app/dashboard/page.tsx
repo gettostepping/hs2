@@ -51,9 +51,9 @@ export default function Dashboard() {
   const [isCrossRefExportModalOpen, setIsCrossRefExportModalOpen] = useState(false);
   const [exportColumns, setExportColumns] = useState({
     name: true,
+    course: true,
     email: true,
     phone: true,
-    meetings: true,
     lastInteraction: true,
   });
 
@@ -61,9 +61,9 @@ export default function Dashboard() {
     const allSelected = Object.values(exportColumns).every(Boolean);
     setExportColumns({
       name: !allSelected,
+      course: !allSelected,
       email: !allSelected,
       phone: !allSelected,
-      meetings: !allSelected,
       lastInteraction: !allSelected,
     });
   };
@@ -170,15 +170,15 @@ export default function Dashboard() {
 
   const crossRefViewLabel =
     crossRefView === 're_registered'
-      ? `Re-registered in ${compareYear}`
-      : 'Awaiting re-registration';
+      ? `Already Renewed in ${compareYear}`
+      : 'Needs Renewal';
 
   const downloadCrossRefCSV = () => {
     const headers = [];
     if (exportColumns.name) headers.push('Name');
+    if (exportColumns.course) headers.push('Course');
     if (exportColumns.email) headers.push('Email');
     if (exportColumns.phone) headers.push('Phone Number');
-    if (exportColumns.meetings) headers.push('Appointments');
     if (exportColumns.lastInteraction) headers.push('Last Meeting');
 
     if (headers.length === 0) {
@@ -191,9 +191,9 @@ export default function Dashboard() {
       ...crossRefDisplayClients.map(c => {
         const row = [];
         if (exportColumns.name) row.push(`"${c.name}"`);
+        if (exportColumns.course) row.push(`"${c.course || ''}"`);
         if (exportColumns.email) row.push(`"${c.email}"`);
         if (exportColumns.phone) row.push(`"${c.phoneNumber || ''}"`);
-        if (exportColumns.meetings) row.push(c.meetings);
         if (exportColumns.lastInteraction) row.push(c.lastMeeting ? new Date(c.lastMeeting).toLocaleDateString() : 'N/A');
         return row.join(',');
       }),
@@ -219,9 +219,9 @@ export default function Dashboard() {
   const downloadCSV = () => {
     const headers = [];
     if (exportColumns.name) headers.push('Name');
+    if (exportColumns.course) headers.push('Course');
     if (exportColumns.email) headers.push('Email');
     if (exportColumns.phone) headers.push('Phone Number');
-    if (exportColumns.meetings) headers.push('Appointments');
     if (exportColumns.lastInteraction) headers.push('Last Meeting');
 
     if (headers.length === 0) {
@@ -234,9 +234,9 @@ export default function Dashboard() {
       ...clients.map(c => {
         const row = [];
         if (exportColumns.name) row.push(`"${c.name}"`);
+        if (exportColumns.course) row.push(`"${c.course || ''}"`);
         if (exportColumns.email) row.push(`"${c.email}"`);
         if (exportColumns.phone) row.push(`"${c.phoneNumber || ''}"`);
-        if (exportColumns.meetings) row.push(c.meetings);
         if (exportColumns.lastInteraction) row.push(c.lastMeeting ? new Date(c.lastMeeting).toLocaleDateString() : 'N/A');
         return row.join(',');
       }),
@@ -407,9 +407,9 @@ export default function Dashboard() {
                     <thead className="sticky top-0 z-10 bg-gray-50 text-gray-600 text-sm shadow-[0_1px_0_0_rgb(243_244_246)]">
                       <tr>
                         <th className="px-6 py-4 font-medium">Client Name</th>
+                        <th className="px-6 py-4 font-medium">Course</th>
                         <th className="px-6 py-4 font-medium">Email Address</th>
                         <th className="px-6 py-4 font-medium">Phone Number</th>
-                        <th className="px-6 py-4 font-medium">Meetings</th>
                         <th className="px-6 py-4 font-medium">Last Interaction</th>
                       </tr>
                     </thead>
@@ -424,13 +424,9 @@ export default function Dashboard() {
                         clients.map((client, index) => (
                           <tr key={index} className="hover:bg-gray-50 transition-colors">
                             <td className="px-6 py-4 font-medium text-gray-900">{client.name}</td>
+                            <td className="px-6 py-4 text-gray-600">{client.course || '-'}</td>
                             <td className="px-6 py-4 text-gray-600">{client.email}</td>
                             <td className="px-6 py-4 text-gray-600">{client.phoneNumber || '-'}</td>
-                            <td className="px-6 py-4">
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                {client.meetings}
-                              </span>
-                            </td>
                             <td className="px-6 py-4 text-gray-600">
                               {client.lastMeeting ? new Date(client.lastMeeting).toLocaleDateString() : '-'}
                             </td>
@@ -501,7 +497,7 @@ export default function Dashboard() {
                           {crossRefViewLabel} — {crossRefDisplayClients.length} client{crossRefDisplayClients.length !== 1 ? 's' : ''}
                         </h3>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {reRegisteredClients.length} re-registered · {notReRegisteredClients.length} awaiting re-registration
+                          {reRegisteredClients.length} already renewed · {notReRegisteredClients.length} needs renewal
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-3">
@@ -510,8 +506,8 @@ export default function Dashboard() {
                           onChange={e => setCrossRefView(e.target.value as CrossRefView)}
                           className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                         >
-                          <option value="not_re_registered">Awaiting re-registration</option>
-                          <option value="re_registered">Re-registered in {compareYear}</option>
+                          <option value="not_re_registered">Needs Renewal</option>
+                          <option value="re_registered">Already Renewed in {compareYear}</option>
                         </select>
                         {crossRefDisplayClients.length > 0 && (
                           <button
@@ -530,9 +526,9 @@ export default function Dashboard() {
                         <thead className="sticky top-0 z-10 bg-gray-50 text-gray-600 text-sm shadow-[0_1px_0_0_rgb(243_244_246)]">
                           <tr>
                             <th className="px-6 py-4 font-medium">Client Name</th>
+                            <th className="px-6 py-4 font-medium">Course</th>
                             <th className="px-6 py-4 font-medium">Email Address</th>
                             <th className="px-6 py-4 font-medium">Phone Number</th>
-                            <th className="px-6 py-4 font-medium">Meetings</th>
                             <th className="px-6 py-4 font-medium">Last Interaction</th>
                           </tr>
                         </thead>
@@ -541,21 +537,17 @@ export default function Dashboard() {
                             <tr>
                               <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                                 {crossRefView === 're_registered'
-                                  ? `No clients from your list have re-registered in ${compareYear}.`
-                                  : 'All clients from your list have already re-registered.'}
+                                  ? `No clients from your list have already renewed in ${compareYear}.`
+                                  : 'All clients from your list have already renewed.'}
                               </td>
                             </tr>
                           ) : (
                             crossRefDisplayClients.map((client, index) => (
                               <tr key={index} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-6 py-4 font-medium text-gray-900">{client.name}</td>
+                                <td className="px-6 py-4 text-gray-600">{client.course || '-'}</td>
                                 <td className="px-6 py-4 text-gray-600">{client.email}</td>
                                 <td className="px-6 py-4 text-gray-600">{client.phoneNumber || '-'}</td>
-                                <td className="px-6 py-4">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                    {client.meetings}
-                                  </span>
-                                </td>
                                 <td className="px-6 py-4 text-gray-600">
                                   {client.lastMeeting ? new Date(client.lastMeeting).toLocaleDateString() : '-'}
                                 </td>
@@ -607,9 +599,9 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {[
                   { id: 'name', label: 'Client Name' },
+                  { id: 'course', label: 'Course' },
                   { id: 'email', label: 'Email Address' },
                   { id: 'phone', label: 'Phone Number' },
-                  { id: 'meetings', label: 'Appointments' },
                   { id: 'lastInteraction', label: 'Last Meeting' },
                 ].map((col) => (
                   <label key={col.id} className="flex items-center gap-3 cursor-pointer group">
@@ -680,9 +672,9 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {[
                   { id: 'name', label: 'Client Name' },
+                  { id: 'course', label: 'Course' },
                   { id: 'email', label: 'Email Address' },
                   { id: 'phone', label: 'Phone Number' },
-                  { id: 'meetings', label: 'Appointments' },
                   { id: 'lastInteraction', label: 'Last Meeting' },
                 ].map((col) => (
                   <label key={col.id} className="flex items-center gap-3 cursor-pointer group">
