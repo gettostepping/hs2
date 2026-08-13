@@ -11,6 +11,8 @@ import { availableYears, yearRange } from '@/lib/dates';
 type FilterMode = 'single' | 'range';
 type CrossRefView = 'not_re_registered' | 're_registered';
 
+const TABLE_SCROLL_CLASS = 'overflow-auto max-h-72 sm:max-h-80';
+
 // Returns today's date as yyyy-mm-dd
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -400,9 +402,9 @@ export default function Dashboard() {
                   )}
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className={TABLE_SCROLL_CLASS}>
                   <table className="w-full text-left">
-                    <thead className="bg-gray-50 text-gray-600 text-sm">
+                    <thead className="sticky top-0 z-10 bg-gray-50 text-gray-600 text-sm shadow-[0_1px_0_0_rgb(243_244_246)]">
                       <tr>
                         <th className="px-6 py-4 font-medium">Client Name</th>
                         <th className="px-6 py-4 font-medium">Email Address</th>
@@ -523,9 +525,9 @@ export default function Dashboard() {
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className={TABLE_SCROLL_CLASS}>
                       <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-gray-600 text-sm">
+                        <thead className="sticky top-0 z-10 bg-gray-50 text-gray-600 text-sm shadow-[0_1px_0_0_rgb(243_244_246)]">
                           <tr>
                             <th className="px-6 py-4 font-medium">Client Name</th>
                             <th className="px-6 py-4 font-medium">Email Address</th>

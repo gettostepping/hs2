@@ -1,4 +1,4 @@
-import { google } from 'googleapis';
+import { google, calendar_v3 } from 'googleapis';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { cookies } from 'next/headers';
@@ -81,18 +81,31 @@ export async function POST(request: Request) {
     const rangeStart = new Date(startDate + 'T00:00:00');
     const rangeEnd = new Date(endDate + 'T23:59:59');
 
-    console.log(`Extracting for: ${rangeStart.toISOString()} to ${rangeEnd.toISOString()}`);
+    const timeMin = rangeStart.toISOString();
+    const timeMax = rangeEnd.toISOString();
+
+    console.log(`Extracting for: ${timeMin} to ${timeMax}`);
     console.log(`User email: ${user.email}`);
 
-    const eventsResponse = await calendar.events.list({
-      calendarId: 'primary',
-      timeMin: rangeStart.toISOString(),
-      timeMax: rangeEnd.toISOString(),
-      singleEvents: true,
-      orderBy: 'startTime',
-    });
+    // Google Calendar returns max 250 events per page — paginate for busy calendars
+    const events: calendar_v3.Schema$Event[] = [];
+    let pageToken: string | undefined;
 
-    const events = eventsResponse.data.items || [];
+    do {
+      const eventsResponse = await calendar.events.list({
+        calendarId: 'primary',
+        timeMin,
+        timeMax,
+        singleEvents: true,
+        orderBy: 'startTime',
+        maxResults: 250,
+        pageToken,
+      });
+
+      events.push(...(eventsResponse.data.items || []));
+      pageToken = eventsResponse.data.nextPageToken ?? undefined;
+    } while (pageToken);
+
     console.log(`Found ${events.length} events`);
     if (events.length > 0) {
       console.log('Sample event attendees:', JSON.stringify(events[0].attendees, null, 2));
